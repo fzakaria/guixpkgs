@@ -2,11 +2,12 @@
 
 (with-store %store
   (for-each
-    (lambda (package)
+    (lambda (pkg-name)
       (catch #t
         (lambda ()
-          (let ((drv (package-derivation %store package "x86_64-linux" #:graft? #f)))
+          (let* ((package (specification->package pkg-name))
+                 (drv (package-derivation %store package "x86_64-linux" #:graft? #f)))
             (format #t "~a\t~a\n" (package-name package) (derivation-file-name drv))))
         (lambda (key . args)
-          (format (current-error-port) "Failed: ~a\n" (package-name package)))))
-    (fold-packages cons '())))
+          (format (current-error-port) "Failed: ~a\n" pkg-name))))
+    '("hello" "bash" "coreutils")))
