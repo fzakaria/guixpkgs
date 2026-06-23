@@ -53,29 +53,29 @@
       # Use guix time-machine to perfectly decouple from the host's daemon version
       guix time-machine -C channels.scm -- repl ./get-all-derivations.scm > drv_mapping.txt
       
-      DRVS=\$(awk '{print \$2}' drv_mapping.txt)
+      DRVS=$(awk '{print $2}' drv_mapping.txt)
 
       echo "Translating Guix derivations to Nix expressions..."
-      ${guix-transfer.packages.${system}.default}/bin/guix-transfer \$DRVS > transfer_out.txt
+      ${guix-transfer.packages.${system}.default}/bin/guix-transfer $DRVS > transfer_out.txt
 
       echo "Creating by-name mapping..."
       mkdir -p pkgs/by-name
       rm -rf pkgs/by-name/*
       
-      awk '/^\/nix\/store/ {print \$1}' transfer_out.txt > nix_drvs.txt
+      awk '/^\/nix\/store/ {print $1}' transfer_out.txt > nix_drvs.txt
 
       while read -r name drv_path; do
-          if grep -q "^\$drv_path\$" nix_drvs.txt; then
-              letter=\$(echo "\$name" | cut -c 1 | tr '[:upper:]' '[:lower:]')
-              mkdir -p "pkgs/by-name/\$letter"
+          if grep -q "^$drv_path$" nix_drvs.txt; then
+              letter=$(echo "$name" | cut -c 1 | tr '[:upper:]' '[:lower:]')
+              mkdir -p "pkgs/by-name/$letter"
               
-              nix_filename=\$(basename "\$drv_path" | sed 's/\.drv$/.nix/')
-              echo "import ../../store/\$nix_filename" > "pkgs/by-name/\$letter/\$name.nix"
+              nix_filename=$(basename "$drv_path" | sed 's/\.drv$/.nix/')
+              echo "import ../../store/$nix_filename" > "pkgs/by-name/$letter/$name.nix"
           fi
       done < drv_mapping.txt
       
       echo "Writing metadata..."
-      echo "{ \"channel\": \"guix\", \"commit\": \"${guix-src.rev}\", \"timestamp\": \"\$(date -u +"%Y-%m-%dT%H:%M:%SZ")\" }" > guix-metadata.json
+      echo "{ \"channel\": \"guix\", \"commit\": \"${guix-src.rev}\", \"timestamp\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\" }" > guix-metadata.json
       
       echo "Cleaning up..."
       rm channels.scm drv_mapping.txt transfer_out.txt nix_drvs.txt
