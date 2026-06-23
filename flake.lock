@@ -1,6 +1,58 @@
 {
   "nodes": {
+    "guix-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1777455062,
+        "narHash": "sha256-gNG8rAaFjaMfltfMAd6HERxC4ZZEW25ykfk6kTIZXZQ=",
+        "ref": "version-1.5.0",
+        "rev": "ac03c482b1910a1672427beaea07ddcd1d652806",
+        "shallow": true,
+        "type": "git",
+        "url": "https://git.savannah.gnu.org/git/guix.git"
+      },
+      "original": {
+        "ref": "version-1.5.0",
+        "shallow": true,
+        "type": "git",
+        "url": "https://git.savannah.gnu.org/git/guix.git"
+      }
+    },
+    "guix-transfer": {
+      "inputs": {
+        "nixpkgs": "nixpkgs"
+      },
+      "locked": {
+        "lastModified": 1782248191,
+        "narHash": "sha256-Z1n/Q/j92T2Zc0/gy1UFfWfwFbKEaeOyu9gSWSjAE7I=",
+        "owner": "fzakaria",
+        "repo": "guix-transfer",
+        "rev": "61e6464be542e5a14f1feec06b80523381e8064e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "fzakaria",
+        "repo": "guix-transfer",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
+      "locked": {
+        "lastModified": 1781607440,
+        "narHash": "sha256-rxO+uc/KFbSJp+pgyXRuAX6QlG9hJdnt0BXpEQRXY+U=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "3e41b24abd260e8f71dbe2f5737d24122f972158",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixpkgs-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "nixpkgs_2": {
       "locked": {
         "lastModified": 1781577229,
         "narHash": "sha256-lrp67w8AulE9Ks53n27I45ADSzbOCn4H+CNW1Ck8B+8=",
@@ -18,7 +70,9 @@
     },
     "root": {
       "inputs": {
-        "nixpkgs": "nixpkgs"
+        "guix-src": "guix-src",
+        "guix-transfer": "guix-transfer",
+        "nixpkgs": "nixpkgs_2"
       }
     }
   },
