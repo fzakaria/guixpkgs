@@ -1,0 +1,32 @@
+This patch is taken from debian's glibc package (generate-supported.mk).
+It install the localedata/SUPPORTED file of the glibc. This file lists
+all the supported locales of the glibc.
+
+diff --git a/localedata/Makefile b/localedata/Makefile
+--- a/localedata/Makefile
++++ b/localedata/Makefile
+@@ -176,7 +176,8 @@
+ else
+ install-others := $(addprefix $(inst_i18ndir)/, \
+ 			      $(addsuffix .gz, $(charmaps)) \
+-			      $(locales))
++			      $(locales)) \
++                   $(inst_i18ndir)/SUPPORTED
+ endif
+ 
+ tests: $(objdir)/iconvdata/gconv-modules
+@@ -401,6 +402,14 @@
+ 
+ include SUPPORTED
+ 
++$(inst_i18ndir)/SUPPORTED: SUPPORTED $(+force)
++	for locale in $(SUPPORTED-LOCALES); do \
++		[ $$locale = true ] && continue; \
++		echo $$locale | sed 's,/, ,' >> LOCALES; \
++	done
++	$(make-target-directory)
++	$(INSTALL_DATA) LOCALES $@
++
+ INSTALL-SUPPORTED-LOCALE-ARCHIVE=$(addprefix install-archive-, $(SUPPORTED-LOCALES))
+ INSTALL-SUPPORTED-LOCALE-FILES=$(addprefix install-files-, $(SUPPORTED-LOCALES))
+ 
