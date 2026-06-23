@@ -9,24 +9,28 @@ fi
 
 echo "Fetching derivations..."
 # NixOS rule: Use nix-shell -p steam-run -- steam-run if we need to run foreign bins, but guix repl works natively with guix
-guix repl get-target-derivations.scm > drv_mapping.txt
+guix repl get-all-derivations.scm > drv_mapping.txt
 
 DRVS=$(awk '{print $2}' drv_mapping.txt)
 
 echo "Translating to Nix..."
 rm -rf pkgs/
 mkdir -p pkgs/by-name
-$GUIX_TRANSFER_BIN --emit-nix-dir ./pkgs $DRVS
+$GUIX_TRANSFER_BIN --emit-nix-dir ./pkgs $DRVS > transfer_out.txt
 
 echo "Creating by-name mapping..."
-while read -r name drv; do
-    DRV_BASE=$(basename "$drv")
+# Extract just the /nix/store paths
+grep "^/nix/store/" transfer_out.txt > nix_drvs.txt
+
+# Combine package name from drv_mapping.txt with the final Nix path from nix_drvs.txt
+paste <(awk '{print $1}' drv_mapping.txt) nix_drvs.txt | while read -r name nix_drv; do
+    NIX_BASE=$(basename "$nix_drv" .drv).nix
     
     first_letter=${name:0:1}
     mkdir -p "pkgs/by-name/$first_letter"
     
-    echo "import ../../store/${DRV_BASE}.nix" > "pkgs/by-name/$first_letter/$name.nix"
-done < drv_mapping.txt
+    echo "import ../../store/${NIX_BASE}" > "pkgs/by-name/$first_letter/$name.nix"
+done
 
 echo "Writing metadata..."
 echo "{ \"channel\": \"guix\", \"timestamp\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\" }" > guix-metadata.json
