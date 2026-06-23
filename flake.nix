@@ -54,7 +54,7 @@
       guix time-machine -C channels.scm -- repl ./get-all-derivations.scm > drv_mapping.txt
       
       echo "Translating Guix derivations to Nix expressions..."
-      awk '{print $2}' drv_mapping.txt | xargs ${guix-transfer.packages.${system}.default}/bin/guix-transfer --emit-nix-dir pkgs/store > transfer_out.txt
+      awk '{print $2}' drv_mapping.txt | xargs ${guix-transfer.packages.${system}.default}/bin/guix-transfer --emit-nix-dir pkgs > transfer_out.txt
 
       echo "Creating by-name mapping..."
       mkdir -p pkgs/by-name
