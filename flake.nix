@@ -3,6 +3,10 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    guix-src = {
+      url = "git+https://git.savannah.gnu.org/git/guix.git";
+      flake = false;
+    };
   };
 
   outputs = { self, nixpkgs }: 

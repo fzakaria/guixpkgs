@@ -5,9 +5,18 @@ GUIX_TRANSFER_BIN="/home/fmzakari/code/github.com/fzakaria/guix-transfer/target/
 if [ ! -f "$GUIX_TRANSFER_BIN" ]; then
     echo "Please build guix-transfer first: cargo build --release in ../guix-transfer"
     exit 1
-fi
-
 echo "Fetching derivations..."
+# Extract the pinned Guix commit from our flake.lock!
+GUIX_COMMIT=$(nix flake metadata --json | jq -r '.locks.nodes["guix-src"].locked.rev')
+echo "Using Guix commit $GUIX_COMMIT from flake.lock"
+
+cat > channels.scm <<EOF
+(list (channel
+        (name 'guix)
+        (url "https://git.savannah.gnu.org/git/guix.git")
+        (commit "$GUIX_COMMIT")))
+EOF
+
 # Use guix time-machine to perfectly decouple from the host's daemon version
 guix time-machine -C channels.scm -- repl get-all-derivations.scm > drv_mapping.txt
 
