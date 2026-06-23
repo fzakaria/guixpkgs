@@ -1,5 +1,5 @@
 {
-  description = "MetaPkgs: Guix packages via Nix";
+  description = "GuixPkgs: Guix packages via Nix";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";

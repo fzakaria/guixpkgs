@@ -1,6 +1,6 @@
-# MetaPkgs
+# GuixPkgs
 
-**MetaPkgs** is an ambitious project to bridge the gap between the GNU Guix and Nix ecosystems. It translates the entirety of Guix's package definitions into pure, lazily-evaluable Nix expressions, without relying on Import From Derivation (IFD).
+**GuixPkgs** is an ambitious project to bridge the gap between the GNU Guix and Nix ecosystems. It translates the entirety of Guix's package definitions into pure, lazily-evaluable Nix expressions, without relying on Import From Derivation (IFD).
 
 ## Motivation
 
@@ -17,10 +17,10 @@ The goal of this repository is to act as a direct, automated translation layer:
 
 ## How it Works
 
-MetaPkgs leverages [guix-transfer](https://github.com/fzakaria/guix-transfer) to perform a one-time conversion per Guix commit. The resulting repository tree looks like this:
+GuixPkgs leverages [guix-transfer](https://github.com/fzakaria/guix-transfer) to perform a one-time conversion per Guix commit. The resulting repository tree looks like this:
 
 ```
-metapkgs/
+guixpkgs/
 ├── flake.nix             # The entry point exposing the Guix packages as Nix outputs
 ├── guix-metadata.json    # Tracks the Guix channel, commit, and sync timestamp
 ├── .github/
@@ -39,9 +39,9 @@ metapkgs/
 
 ## Example Usage
 
-Because `MetaPkgs` translates Guix packages into pure Nix expressions, they become standard Nix derivations (technically, they evaluate to an attribute set created by `builtins.derivation { ... }`).
+Because `GuixPkgs` translates Guix packages into pure Nix expressions, they become standard Nix derivations (technically, they evaluate to an attribute set created by `builtins.derivation { ... }`).
 
-In your own projects, you can mix and match `nixpkgs` and `metapkgs` seamlessly via flakes:
+In your own projects, you can mix and match `nixpkgs` and `guixpkgs` seamlessly via flakes:
 
 ```nix
 {
@@ -49,19 +49,19 @@ In your own projects, you can mix and match `nixpkgs` and `metapkgs` seamlessly 
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    metapkgs.url = "github:fzakaria/metapkgs";
+    guixpkgs.url = "github:fzakaria/guixpkgs";
   };
 
-  outputs = { self, nixpkgs, metapkgs }:
+  outputs = { self, nixpkgs, guixpkgs }:
   let
     system = "x86_64-linux";
     pkgs = nixpkgs.legacyPackages.${system};
-    guixPkgs = metapkgs.packages.${system};
+    guixPkgs = guixpkgs.packages.${system};
   in {
     devShells.${system}.default = pkgs.mkShell {
       buildInputs = [
         pkgs.git                   # From Nixpkgs
-        guixPkgs.hello             # From Guix (via MetaPkgs)
+        guixPkgs.hello             # From Guix (via GuixPkgs)
       ];
     };
   };
