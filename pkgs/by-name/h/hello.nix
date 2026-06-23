@@ -1,1 +1,1 @@
-import ../../store/f0sgfzr1za0mnnm6bk9qiqkyapdby7bv-hello-2.12.2.drv.nix
+import ../../store/2qqp8yl246qrm5n95ml18x8h2kc9ngvr-hello-2.12.2.nix

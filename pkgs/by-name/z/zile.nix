@@ -1,1 +1,1 @@
-import ../../store/lpa5qw0810zc8f2kpp3yywrbmhv5d5lg-zile-2.6.4.drv.nix
+import ../../store/nz7mp8asvs58p6bnydwfpnwpm8iy18rg-zile-2.6.4.nix
