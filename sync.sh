@@ -5,6 +5,7 @@ GUIX_TRANSFER_BIN="/home/fmzakari/code/github.com/fzakaria/guix-transfer/target/
 if [ ! -f "$GUIX_TRANSFER_BIN" ]; then
     echo "Please build guix-transfer first: cargo build --release in ../guix-transfer"
     exit 1
+fi
 echo "Fetching derivations..."
 # Extract the pinned Guix commit from our flake.lock!
 GUIX_COMMIT=$(nix flake metadata --json | jq -r '.locks.nodes["guix-src"].locked.rev')
