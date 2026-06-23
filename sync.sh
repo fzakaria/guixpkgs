@@ -8,8 +8,8 @@ if [ ! -f "$GUIX_TRANSFER_BIN" ]; then
 fi
 
 echo "Fetching derivations..."
-# NixOS rule: Use nix-shell -p steam-run -- steam-run if we need to run foreign bins, but guix repl works natively with guix
-guix repl get-all-derivations.scm > drv_mapping.txt
+# Use guix time-machine to perfectly decouple from the host's daemon version
+guix time-machine -C channels.scm -- repl get-all-derivations.scm > drv_mapping.txt
 
 DRVS=$(awk '{print $2}' drv_mapping.txt)
 
