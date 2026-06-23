@@ -23,11 +23,11 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1782257957,
-        "narHash": "sha256-L/C4btEgKFqEMxIRDDZ0cp9HKyorhz6hS34kwo7qT2k=",
+        "lastModified": 1782258602,
+        "narHash": "sha256-O2wmlbmLpGD0YGMo/pwqaSzM6LrI6dIOLKTKeDaAodk=",
         "owner": "fzakaria",
         "repo": "guix-transfer",
-        "rev": "41f1a3e04aa2edf734e23a69e5ddfa7e76b07cde",
+        "rev": "389e4170aca1684e892e271cf82bca4004db5ca5",
         "type": "github"
       },
       "original": {
