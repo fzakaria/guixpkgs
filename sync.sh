@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-GUIX_TRANSFER_BIN="/home/fmzakari/code/github.com/fzakaria/guix-transfer/target/release/guix-transfer"
+GUIX_TRANSFER_BIN="$(cd .. && pwd)/guix-transfer/target/release/guix-transfer"
+echo "Looking for guix-transfer at: $GUIX_TRANSFER_BIN"
 if [ ! -f "$GUIX_TRANSFER_BIN" ]; then
     echo "Please build guix-transfer first: cargo build --release in ../guix-transfer"
+    ls -la "$(cd .. && pwd)/guix-transfer/target/release" || true
     exit 1
 fi
 echo "Fetching derivations..."
