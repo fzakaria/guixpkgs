@@ -59,15 +59,12 @@
       echo "Creating by-name mapping..."
       mkdir -p pkgs/by-name
       rm -rf pkgs/by-name/*
-      
-      awk '/^\/nix\/store/ {print $1}' transfer_out.txt > nix_drvs.txt
 
       while read -r name drv_path; do
-          if grep -q "^$drv_path$" nix_drvs.txt; then
+          nix_filename=$(basename "$drv_path" | sed 's/\.drv$/.nix/')
+          if [ -f "pkgs/store/$nix_filename" ]; then
               letter=$(echo "$name" | cut -c 1 | tr '[:upper:]' '[:lower:]')
               mkdir -p "pkgs/by-name/$letter"
-              
-              nix_filename=$(basename "$drv_path" | sed 's/\.drv$/.nix/')
               echo "import ../../store/$nix_filename" > "pkgs/by-name/$letter/$name.nix"
           fi
       done < drv_mapping.txt
@@ -76,13 +73,13 @@
       echo "{ \"channel\": \"guix\", \"commit\": \"${guix-src.rev}\", \"timestamp\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\" }" > guix-metadata.json
       
       echo "Cleaning up..."
-      rm channels.scm drv_mapping.txt transfer_out.txt nix_drvs.txt
+      rm channels.scm drv_mapping.txt transfer_out.txt
       
-      echo "Done!"
+      echo "Done! IMPORTANT: Run 'git add pkgs/' so Nix can see the newly generated files!"
     '';
 
   in {
-    packages.${system} = readByName ./pkgs/by-name;
+    packages.${system} = if builtins.pathExists ./pkgs/by-name then readByName ./pkgs/by-name else {};
     
     apps.${system}.sync = {
       type = "app";
