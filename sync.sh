@@ -15,7 +15,12 @@ cat > channels.scm <<EOF
 (list (channel
         (name 'guix)
         (url "https://git.savannah.gnu.org/git/guix.git")
-        (commit "$GUIX_COMMIT")))
+        (commit "$GUIX_COMMIT")
+        (introduction
+         (make-channel-introduction
+          "9edb3f66fd807b096b48283debdcddccfea34bad"
+          (openpgp-fingerprint
+           "BBB0 2DDF 2CEA F6A8 0D1D  E643 A2A0 6DF2 A33A 54FA")))))
 EOF
 
 # Use guix time-machine to perfectly decouple from the host's daemon version
