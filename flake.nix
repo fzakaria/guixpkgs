@@ -4,7 +4,7 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     guix-src = {
-      url = "git+https://git.savannah.gnu.org/git/guix.git";
+      url = "git+https://git.savannah.gnu.org/git/guix.git?ref=version-1.5.0";
       flake = false;
     };
   };
