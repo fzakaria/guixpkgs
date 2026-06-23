@@ -21,17 +21,8 @@ jobs:
       - name: Install Guix
         uses: PromyLOPh/guix-install-action@v1
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Build guix-transfer
-        run: |
-          git clone https://github.com/fzakaria/guix-transfer ../guix-transfer
-          cd ../guix-transfer
-          cargo build --release
-
-      - name: Run Sync Script
-        run: ./sync.sh
+      - name: Run Sync App
+        run: nix run .#sync
 
       - name: Commit and Push Changes
         run: |
