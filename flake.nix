@@ -54,26 +54,31 @@
       guix time-machine -C channels.scm -- repl ./get-all-derivations.scm > drv_mapping.txt
       
       echo "Translating Guix derivations to Nix expressions..."
-      awk '{print $2}' drv_mapping.txt | xargs ${guix-transfer.packages.${system}.default}/bin/guix-transfer > transfer_out.txt
+      awk '{print $2}' drv_mapping.txt | xargs ${guix-transfer.packages.${system}.default}/bin/guix-transfer --emit-nix-dir pkgs/store > transfer_out.txt
 
       echo "Creating by-name mapping..."
       mkdir -p pkgs/by-name
       rm -rf pkgs/by-name/*
 
-      while read -r name drv_path; do
-          nix_filename=$(basename "$drv_path" | sed 's/\.drv$/.nix/')
-          if [ -f "pkgs/store/$nix_filename" ]; then
-              letter=$(echo "$name" | cut -c 1 | tr '[:upper:]' '[:lower:]')
-              mkdir -p "pkgs/by-name/$letter"
-              echo "import ../../store/$nix_filename" > "pkgs/by-name/$letter/$name.nix"
+      awk '{print $1}' drv_mapping.txt > names.txt
+      paste names.txt transfer_out.txt > name_to_nix_drv.txt
+
+      while read -r name nix_drv_path; do
+          if [ -n "$nix_drv_path" ]; then
+              nix_filename=$(basename "$nix_drv_path" | sed 's/\.drv$/.nix/')
+              if [ -f "pkgs/store/$nix_filename" ]; then
+                  letter=$(echo "$name" | cut -c 1 | tr '[:upper:]' '[:lower:]')
+                  mkdir -p "pkgs/by-name/$letter"
+                  echo "import ../../store/$nix_filename" > "pkgs/by-name/$letter/$name.nix"
+              fi
           fi
-      done < drv_mapping.txt
+      done < name_to_nix_drv.txt
       
       echo "Writing metadata..."
       echo "{ \"channel\": \"guix\", \"commit\": \"${guix-src.rev}\", \"timestamp\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\" }" > guix-metadata.json
       
       echo "Cleaning up..."
-      rm channels.scm drv_mapping.txt transfer_out.txt
+      rm channels.scm drv_mapping.txt transfer_out.txt names.txt name_to_nix_drv.txt
       
       echo "Done! IMPORTANT: Run 'git add pkgs/' so Nix can see the newly generated files!"
     '';
