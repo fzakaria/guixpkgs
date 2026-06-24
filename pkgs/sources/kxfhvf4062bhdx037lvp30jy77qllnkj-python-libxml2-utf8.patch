@@ -1,0 +1,40 @@
+This patch fixes a crash in the libxml2 bindings for Python 3.x
+that 'itstool' stumbles upon when processing UTF-8 data:
+
+  https://issues.guix.gnu.org/issue/37468
+
+Patch by Jan Matejek
+from <https://bugzilla.opensuse.org/show_bug.cgi?id=1065270>.
+
+--- a/python/libxml.c
++++ b/python/libxml.c
+@@ -1499,6 +1499,7 @@ libxml_xmlErrorFuncHandler(ATTRIBUTE_UNUSED void *ctx, const char *msg,
+     PyObject *message;
+     PyObject *result;
+     char str[1000];
++    unsigned char *ptr = (unsigned char *)str;
+ 
+     if (libxml_xmlPythonErrorFuncHandler == NULL) {
+         va_start(ap, msg);
+@@ -1510,12 +1511,20 @@ libxml_xmlErrorFuncHandler(ATTRIBUTE_UNUSED void *ctx, const char *msg,
+            str[999] = 0;
+         va_end(ap);
+ 
++#if PY_MAJOR_VERSION >= 3
++        /* Ensure the error string doesn't start at UTF8 continuation. */
++        while (*ptr && (*ptr & 0xc0) == 0x80)
++            ptr++;
++#endif
++
+         list = PyTuple_New(2);
+         PyTuple_SetItem(list, 0, libxml_xmlPythonErrorFuncCtxt);
+         Py_XINCREF(libxml_xmlPythonErrorFuncCtxt);
+-        message = libxml_charPtrConstWrap(str);
++        message = libxml_charPtrConstWrap(ptr);
+         PyTuple_SetItem(list, 1, message);
+         result = PyObject_CallObject(libxml_xmlPythonErrorFuncHandler, list);
++        /* Forget any errors caused in the error handler. */
++        PyErr_Clear();
+         Py_XDECREF(list);
+         Py_XDECREF(result);
+     }
