@@ -107,10 +107,14 @@ In your own projects, you can mix and match `nixpkgs` and `guixpkgs` seamlessly 
 ```
 
 Run standard Nix commands against Guix packages effortlessly:
+
+> [!NOTE]
+> Building Guix packages from source within Nix can sometimes fail during bootstrap (e.g., `chmod: Operation not permitted`). This is often because Guix's bootstrap scripts try to restore `SETGID` bits, which the Nix sandbox strictly blocks. To successfully build from source, you may need to disable syscall filtering and/or the sandbox temporarily.
+
 ```bash
 # Build the GNU Hello package from Guix
-nix build .#hello
+nix build .#hello --option filter-syscalls false --option sandbox false
 
 # Drop into a shell with Zile from Guix
-nix shell .#zile
+nix shell .#zile --option filter-syscalls false --option sandbox false
 ```
