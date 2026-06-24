@@ -1,6 +1,11 @@
 {
   description = "GuixPkgs: Guix packages via Nix";
 
+  nixConfig = {
+    extra-substituters = [ "https://guixpkgs.cachix.org" ];
+    extra-trusted-public-keys = [ "guixpkgs.cachix.org-1:rM4xwCs5NUy+FcCKkiWP/CmRaSVxxDPaKWZvM1bRopg=" ];
+  };
+
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     guix-src = {

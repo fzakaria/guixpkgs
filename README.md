@@ -52,6 +52,25 @@ After the sync completes, make sure to add the newly generated files to your git
 git add pkgs/
 ```
 
+## Binary Cache
+
+To avoid building Guix packages from source, you can use the provided Cachix binary cache. You can configure this by adding the following `nixConfig` to your `flake.nix`:
+
+```nix
+  nixConfig = {
+    extra-substituters = [ "https://guixpkgs.cachix.org" ];
+    extra-trusted-public-keys = [ "guixpkgs.cachix.org-1:rM4xwCs5NUy+FcCKkiWP/CmRaSVxxDPaKWZvM1bRopg=" ];
+  };
+```
+
+Alternatively, you can temporarily use it via the command line:
+
+```bash
+nix build .#hello \
+  --extra-substituters https://guixpkgs.cachix.org \
+  --extra-trusted-public-keys guixpkgs.cachix.org-1:rM4xwCs5NUy+FcCKkiWP/CmRaSVxxDPaKWZvM1bRopg=
+```
+
 ## Example Usage
 
 Because `GuixPkgs` translates Guix packages into pure Nix expressions, they become standard Nix derivations (technically, they evaluate to an attribute set created by `builtins.derivation { ... }`).
