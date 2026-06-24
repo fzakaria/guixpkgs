@@ -4,7 +4,7 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     guix-src = {
-      url = "git+https://git.savannah.gnu.org/git/guix.git?ref=version-1.5.0&shallow=1";
+      url = "git+https://codeberg.org/guix/guix.git?ref=version-1.5.0&shallow=1";
       flake = false;
     };
     guix-transfer.url = "github:fzakaria/guix-transfer";
@@ -41,7 +41,7 @@
       cat > channels.scm <<EOF
       (list (channel
               (name 'guix)
-              (url "https://git.savannah.gnu.org/git/guix.git")
+              (url "https://codeberg.org/guix/guix.git")
               (commit "${guix-src.rev}")
               (introduction
                (make-channel-introduction

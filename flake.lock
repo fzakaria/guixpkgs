@@ -9,13 +9,13 @@
         "rev": "ac03c482b1910a1672427beaea07ddcd1d652806",
         "shallow": true,
         "type": "git",
-        "url": "https://git.savannah.gnu.org/git/guix.git"
+        "url": "https://codeberg.org/guix/guix.git"
       },
       "original": {
         "ref": "version-1.5.0",
         "shallow": true,
         "type": "git",
-        "url": "https://git.savannah.gnu.org/git/guix.git"
+        "url": "https://codeberg.org/guix/guix.git"
       }
     },
     "guix-transfer": {
@@ -23,11 +23,11 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1782258602,
-        "narHash": "sha256-O2wmlbmLpGD0YGMo/pwqaSzM6LrI6dIOLKTKeDaAodk=",
+        "lastModified": 1782268766,
+        "narHash": "sha256-jUVrCyptvCDVwIrMt+bv1r9JshYZdLf4WGoOh3ThCC0=",
         "owner": "fzakaria",
         "repo": "guix-transfer",
-        "rev": "389e4170aca1684e892e271cf82bca4004db5ca5",
+        "rev": "8dacc51b5f070197bf6981b5725cb7397e5097d3",
         "type": "github"
       },
       "original": {
