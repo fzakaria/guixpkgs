@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.png" alt="GuixPkgs Logo" width="250" />
+</p>
+
 # GuixPkgs
 
 **GuixPkgs** is an ambitious project to bridge the gap between the GNU Guix and Nix ecosystems. It translates the entirety of Guix's package definitions into pure, lazily-evaluable Nix expressions, without relying on Import From Derivation (IFD).
