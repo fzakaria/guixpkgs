@@ -37,6 +37,21 @@ guixpkgs/
     └── sources/          # Local files (patches, builder scripts) referenced by the derivations
 ```
 
+## Syncing Manually
+
+You can manually trigger the translation of Guix derivations into Nix expressions at any time. The flake exposes an app to run the synchronization process:
+
+```bash
+# Note: This requires `guix` to be installed and the Guix daemon running.
+nix run .#sync
+```
+
+After the sync completes, make sure to add the newly generated files to your git index so that Nix can evaluate them:
+
+```bash
+git add pkgs/
+```
+
 ## Example Usage
 
 Because `GuixPkgs` translates Guix packages into pure Nix expressions, they become standard Nix derivations (technically, they evaluate to an attribute set created by `builtins.derivation { ... }`).
