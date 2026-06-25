@@ -29,7 +29,11 @@ rec {
       builderSrc = lib.findFirst isBuilder
         (throw "patchBuilder: no '*-builder' source in ${old.name or "<unknown>"}")
         (old.srcs or [ ]);
-      patched = builtins.toFile (baseNameOf (toString builderSrc))
+      # `builtins.toFile` requires a context-free name, but baseNameOf of a
+      # store path carries the original path's string context — strip it.
+      builderName =
+        baseNameOf (builtins.unsafeDiscardStringContext (toString builderSrc));
+      patched = builtins.toFile builderName
         (sub (builtins.readFile builderSrc));
     in
     builtins.derivation (old // {
