@@ -1,1 +1,1 @@
-import ../../store/l8jj0vfi3s3yn9v6b9gw5i30116xz30h-g-golf-0.8.2.nix
+import ../../store/v77wc6rjjk7wghl4nkayziiw9l7pm104-g-golf-0.8.2.nix

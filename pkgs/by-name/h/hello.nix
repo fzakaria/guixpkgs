@@ -1,1 +1,1 @@
-import ../../store/my01rgdns3by9ijz262klhxz4129zv5y-hello-2.12.2.nix
+import ../../store/xa58cqs5z62szafxbjxb6qyy7brv0s6s-hello-2.12.2.nix

@@ -1,1 +1,1 @@
-import ../../store/3zap6nf5y8i06m6aq9qjqj0bqjmpqp81-guile-ics-0.7.0.nix
+import ../../store/7iiy5c045m71836vp6vbk2svbck0gfz7-guile-ics-0.7.0.nix

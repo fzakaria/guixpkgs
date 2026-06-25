@@ -1,1 +1,1 @@
-import ../../store/89hwsybyqcfsy3slhsfx655c22bml7xl-guile-cv-0.4.0.nix
+import ../../store/cwzd2wrdxgfv6q8fxy712gnz9ddk8car-guile-cv-0.4.0.nix

@@ -1,1 +1,1 @@
-import ../../store/hj5j4lr3kr6ka55cv1si4cc9mx434k08-guile-wisp-1.0.12.nix
+import ../../store/41wn97p5r48pwrxlniy3cgz828vqdgr3-guile-wisp-1.0.12.nix
