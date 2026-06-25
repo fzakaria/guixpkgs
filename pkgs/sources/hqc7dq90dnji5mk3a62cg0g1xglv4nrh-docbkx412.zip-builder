@@ -1,0 +1,1 @@
+(begin (use-modules (guix build utils)) (mkdir ((@ (guile) getenv) "out")) (chdir ((@ (guile) getenv) "out")) (invoke (string-append "/nix/store/4dqgpjg7i79jml07f1zk7l1d7bh1rkc4-unzip-6.0" "/bin/unzip") "/nix/store/p0hi26a3gc887k1lkhxn8j0hn3xi79j7-zipbomb-docbkx412.zip"))

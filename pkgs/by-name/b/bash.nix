@@ -1,1 +1,1 @@
-import ../../store/byc7vicigvhidrb9ab1d8h3y8ixvh12h-bash-5.2.37.nix
+import ../../store/3xa60i23qvpc0i0crj7kczfcf2w7283b-bash-5.2.37.nix

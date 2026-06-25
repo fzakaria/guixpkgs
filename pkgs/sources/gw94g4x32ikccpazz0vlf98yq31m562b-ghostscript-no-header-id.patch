@@ -1,0 +1,57 @@
+This patch makes the "/ID" field optional.
+
+If the environment variable GS_GENERATE_UUIDS is set to "0" or "no", it will
+not write out the "/ID" field (if that's permissible).
+
+Upstream does not want to do this.
+
+See: https://bugs.ghostscript.com/show_bug.cgi?id=698208
+diff --git a/devices/vector/gdevpdf.c b/devices/vector/gdevpdf.c
+index c5abefde2..3859fc088 100644
+--- a/devices/vector/gdevpdf.c
++++ b/devices/vector/gdevpdf.c
+@@ -1909,8 +1909,11 @@ static int pdf_linearise(gx_device_pdf *pdev, pdf_linearisation_t *linear_params
+      * +1 for the linearisation dict and +1 for the primary hint stream.
+      */
+     linear_params->FirsttrailerOffset = gp_ftell(linear_params->Lin_File.file);
+-    gs_snprintf(LDict, sizeof(LDict), "\ntrailer\n<</Size %ld/Info %d 0 R/Root %d 0 R/ID[%s%s]/Prev %d>>\nstartxref\r\n0\n%%%%EOF\n        \n",
+-        linear_params->LastResource + 3, pdev->ResourceUsage[linear_params->Info_id].NewObjectNumber, pdev->ResourceUsage[linear_params->Catalog_id].NewObjectNumber, fileID, fileID, 0);
++    gs_snprintf(LDict, sizeof(LDict), "\ntrailer\n<</Size %ld/Info %d 0 R/Root %d 0 R",
++        linear_params->LastResource + 3, pdev->ResourceUsage[linear_params->Info_id].NewObjectNumber, pdev->ResourceUsage[linear_params->Catalog_id].NewObjectNumber);
++    if (pdev->OwnerPassword.size > 0 || !(!getenv("GS_GENERATE_UUIDS") || (strcasecmp(getenv("GS_GENERATE_UUIDS"), "0") != 0 && strcasecmp(getenv("GS_GENERATE_UUIDS"), "no") != 0))) /* ID is mandatory when encrypting */
++        gs_snprintf(LDict, sizeof(LDict), "/ID[%s%s]", fileID, fileID);
++    gs_snprintf(LDict, sizeof(LDict), "/Prev %d>>\nstartxref\r\n0\n%%%%EOF\n        \n", 0);
+     gp_fwrite(LDict, strlen(LDict), 1, linear_params->Lin_File.file);
+ 
+     /* Write document catalog (Part 4) */
+@@ -2445,8 +2448,11 @@ static int pdf_linearise(gx_device_pdf *pdev, pdf_linearisation_t *linear_params
+     if (code != 0)
+         return_error(gs_error_ioerror);
+ 
+-    gs_snprintf(LDict, sizeof(LDict), "\ntrailer\n<</Size %ld/Info %d 0 R/Root %d 0 R/ID[%s%s]/Prev %"PRId64">>\nstartxref\r\n0\n%%%%EOF\n",
+-        linear_params->LastResource + 3, pdev->ResourceUsage[linear_params->Info_id].NewObjectNumber, pdev->ResourceUsage[linear_params->Catalog_id].NewObjectNumber, fileID, fileID, mainxref);
++    gs_snprintf(LDict, sizeof(LDict), "\ntrailer\n<</Size %ld/Info %d 0 R/Root %d 0 R",
++        linear_params->LastResource + 3, pdev->ResourceUsage[linear_params->Info_id].NewObjectNumber, pdev->ResourceUsage[linear_params->Catalog_id].NewObjectNumber);
++    if (pdev->OwnerPassword.size > 0 || !(!getenv("GS_GENERATE_UUIDS") || (strcasecmp(getenv("GS_GENERATE_UUIDS"), "0") != 0 || strcasecmp(getenv("GS_GENERATE_UUIDS"), "no") != 0))) /* ID is mandatory when encrypting */
++        gs_snprintf(LDict, sizeof(LDict), "/ID[%s%s]", fileID, fileID);
++    gs_snprintf(LDict, sizeof(LDict), "/Prev %"PRId64">>\nstartxref\r\n0\n%%%%EOF\n", mainxref);
+     gp_fwrite(LDict, strlen(LDict), 1, linear_params->sfile);
+ 
+     code = gp_fseek(linear_params->sfile, pdev->ResourceUsage[HintStreamObj].LinearisedOffset, SEEK_SET);
+@@ -3139,10 +3145,12 @@ pdf_close(gx_device * dev)
+             stream_puts(s, "trailer\n");
+             pprintld3(s, "<< /Size %ld /Root %ld 0 R /Info %ld 0 R\n",
+                   pdev->next_id, Catalog_id, Info_id);
+-            stream_puts(s, "/ID [");
+-            psdf_write_string(pdev->strm, pdev->fileID, sizeof(pdev->fileID), 0);
+-            psdf_write_string(pdev->strm, pdev->fileID, sizeof(pdev->fileID), 0);
+-            stream_puts(s, "]\n");
++            if (pdev->OwnerPassword.size > 0 || !(!getenv("GS_GENERATE_UUIDS") || (strcasecmp(getenv("GS_GENERATE_UUIDS"), "0") != 0 || strcasecmp(getenv("GS_GENERATE_UUIDS"), "no") != 0))) { /* ID is mandatory when encrypting */
++                stream_puts(s, "/ID [");
++                psdf_write_string(pdev->strm, pdev->fileID, sizeof(pdev->fileID), 0);
++                psdf_write_string(pdev->strm, pdev->fileID, sizeof(pdev->fileID), 0);
++                stream_puts(s, "]\n");
++            }
+             if (pdev->OwnerPassword.size > 0) {
+                 pprintld1(s, "/Encrypt %ld 0 R ", Encrypt_id);
+             }
