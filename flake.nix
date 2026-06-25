@@ -15,29 +15,48 @@
     guix-transfer.url = "github:fzakaria/guix-transfer";
   };
 
-  outputs = { self, nixpkgs, guix-src, guix-transfer }: 
+  outputs = { self, nixpkgs, guix-src, guix-transfer }:
   let
     system = "x86_64-linux";
     pkgs = nixpkgs.legacyPackages.${system};
+    lib = pkgs.lib;
 
-    # Helper to lazily load all by-name packages
-    readDir = builtins.readDir;
+    storeDir = ./pkgs/store;
+
+    # Overlay helper library + the list of Nix-specific fixups.
+    overlayHelpers = import ./lib/overlay-helpers.nix { inherit lib; };
+    overlays = import ./overlays.nix { helpers = overlayHelpers; };
+
+    # Each generated store file is `{ pkgs }: builtins.derivation { … }` and
+    # references its peers through `pkgs."<store-basename>"`. Load them all and
+    # tie them into a fixpoint keyed by store-file basename, so every dependency
+    # edge resolves through `self` — which is what lets overlays propagate
+    # across the whole transitive graph.
+    loadStore = self:
+      lib.mapAttrs'
+        (fn: _: lib.nameValuePair (lib.removeSuffix ".nix" fn)
+                  (import (storeDir + "/${fn}") { pkgs = self; }))
+        (lib.filterAttrs (n: t: t == "regular" && lib.hasSuffix ".nix" n)
+          (builtins.readDir storeDir));
+
+    guixStore = lib.fix (self:
+      lib.foldl' (acc: ov: acc // ov self acc) (loadStore self) overlays);
+
+    # Resolve friendly names (pkgs/by-name/<l>/<name>.nix holds a "<basename>"
+    # string) to entries in the overlaid fixpoint.
     readByName = dir:
       let
-        letters = readDir dir;
+        letters = builtins.readDir dir;
         loadLetter = letter: type:
           if type == "directory" then
-            let
-              pkgFiles = readDir (dir + "/${letter}");
-              loadPkg = name: type:
-                if type == "regular" && pkgs.lib.hasSuffix ".nix" name then
-                  { name = pkgs.lib.removeSuffix ".nix" name; value = import (dir + "/${letter}/${name}"); }
-                else null;
-            in
-              builtins.listToAttrs (builtins.filter (x: x != null) (pkgs.lib.mapAttrsToList loadPkg pkgFiles))
+            lib.mapAttrs'
+              (fn: _: lib.nameValuePair (lib.removeSuffix ".nix" fn)
+                        guixStore.${import (dir + "/${letter}/${fn}")})
+              (lib.filterAttrs (n: _: lib.hasSuffix ".nix" n)
+                (builtins.readDir (dir + "/${letter}")))
           else {};
       in
-        builtins.foldl' (a: b: a // b) {} (pkgs.lib.mapAttrsToList loadLetter letters);
+        lib.foldl' (a: b: a // b) {} (lib.mapAttrsToList loadLetter letters);
 
     sync-script = pkgs.writeShellScriptBin "sync-guix" ''
       set -euo pipefail
@@ -74,7 +93,10 @@
               if [ -f "pkgs/store/$nix_filename" ]; then
                   letter=$(echo "$name" | cut -c 1 | tr '[:upper:]' '[:lower:]')
                   mkdir -p "pkgs/by-name/$letter"
-                  echo "import ../../store/$nix_filename" > "pkgs/by-name/$letter/$name.nix"
+                  # Store files are now `{ pkgs }: …` functions resolved through
+                  # the fixpoint in flake.nix, so by-name holds the store-file
+                  # basename (a key into that set) rather than a direct import.
+                  printf '"%s"\n' "''${nix_filename%.nix}" > "pkgs/by-name/$letter/$name.nix"
               fi
           fi
       done < name_to_nix_drv.txt
@@ -90,7 +112,14 @@
 
   in {
     packages.${system} = if builtins.pathExists ./pkgs/by-name then readByName ./pkgs/by-name else {};
-    
+
+    # The full overlaid fixpoint, keyed by store-file basename. Useful for
+    # building transitive derivations directly and for downstream overlays.
+    legacyPackages.${system} = guixStore;
+
+    # Re-export the overlay helpers so consumers can write their own fixups.
+    overlayHelpers = overlayHelpers;
+
     apps.${system}.sync = {
       type = "app";
       program = "${sync-script}/bin/sync-guix";
