@@ -17,4 +17,11 @@ with helpers;
   # own per-subcase workarounds only cover the subcases that break under Guix.
   # These are bootstrap toolchain tests Guix already validated, so skip them.
   (disableTestsFor "m4-boot0-1.4.19")
+
+  # perl-boot0 carries `disallowedReferences = <bootstrap binutils>`. That path
+  # is a *disallowed* reference (never a build input), so the transfer has no
+  # /nix/store mapping for it and Nix rejects it as an illegal reference
+  # specifier. Drop the (already-upstream-validated) check. guix-transfer now
+  # also strips these at emit time, so this becomes a no-op after the next sync.
+  (dropReferenceChecksFor "perl-boot0-5.36.0")
 ]

@@ -55,6 +55,20 @@ rec {
   patchTests = subs: patchBuilder
     (builtins.replaceStrings (map (x: x.from) subs) (map (x: x.to) subs));
 
+  # Drop the daemon reference-check attributes (allowed/disallowed
+  # References/Requisites). Use when a specifier points at an untranslated
+  # /gnu/store path, which Nix rejects at build time as an illegal reference
+  # specifier. These are post-build validations Guix already enforced upstream,
+  # so dropping them is safe. (guix-transfer also filters these at emit time;
+  # this overlay unblocks already-generated trees without a full re-sync.)
+  dropReferenceChecks = drv:
+    builtins.derivation (removeAttrs drv.drvAttrs [
+      "allowedReferences"
+      "disallowedReferences"
+      "allowedRequisites"
+      "disallowedRequisites"
+    ]);
+
   # ── overlay builders (final: prev: attrs) ──────────────────────────────────
 
   # Apply `f` (a drv -> drv transformer) to every derivation in the set whose
@@ -66,4 +80,5 @@ rec {
   # Convenience overlays for the common cases.
   disableTestsFor = name: overrideByName name disableTests;
   patchTestsFor = name: subs: overrideByName name (patchTests subs);
+  dropReferenceChecksFor = name: overrideByName name dropReferenceChecks;
 }
