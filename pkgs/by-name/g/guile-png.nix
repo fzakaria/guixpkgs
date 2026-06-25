@@ -1,1 +1,1 @@
-import ../../store/hcslg2vw11zf0ndn02a8jz16vh2f62rg-guile-png-0.8.0.nix
+import ../../store/xsq5hhcxanf8n9sl8l4c5s7hjb99qd3z-guile-png-0.8.0.nix
