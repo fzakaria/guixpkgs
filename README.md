@@ -25,30 +25,27 @@ GuixPkgs leverages [guix-transfer](https://github.com/fzakaria/guix-transfer) to
 
 ```
 guixpkgs/
-├── flake.nix             # Entry point: builds the package-set fixpoint and applies overlays
-├── overlays.nix          # Nix-specific build fixups (test skips, reference checks, …)
-├── lib/
-│   └── overlay-helpers.nix  # Reusable overlay helpers (disableTests, patchTests, …)
+├── flake.nix             # The entry point exposing the Guix packages as Nix outputs
 ├── guix-metadata.json    # Tracks the Guix channel, commit, and sync timestamp
 ├── .github/
 │   └── workflows/
 │       └── sync.yml      # GitHub Action to periodically sync with upstream Guix
 └── pkgs/
-    ├── by-name/          # Human-readable name → store-file key (into the fixpoint)
-    │   ├── h/hello.nix   # e.g., `"b6x8v...-hello-2.12.2"`
+    ├── by-name/          # Human-readable entry points mapping to their derivation
+    │   ├── h/hello.nix   # e.g., `import ../../store/b6x8v...-hello.nix`
     │   └── z/zile.nix
-    ├── store/            # The deduplicated translated derivations, each a
-    │   ├── b6x8v...-hello.nix       #   `{ pkgs }: builtins.derivation { … }` function
+    ├── store/            # The deduplicated translated Nix derivations, each a
+    │   ├── b6x8v...-hello.nix       #   standalone `builtins.derivation { … }`
     │   ├── a1x9z...-glibc.nix
     │   └── ...
     └── sources/          # Local files (patches, builder scripts) referenced by the derivations
 ```
 
-Each file under `store/` is a function of the package set rather than a
-standalone derivation: it references its dependencies through `pkgs."<key>"`
-instead of `import`-ing them directly. `flake.nix` ties them all together in a
-fixpoint, which is what makes the whole graph **overlayable** — see
-[Patching packages with overlays](#patching-packages-with-overlays).
+Each `store/*.nix` file is a self-contained `builtins.derivation` that references
+its dependencies directly via `(import ../store/<file>.nix).<output>`. Some
+packages need small, Nix-specific build adjustments; those are applied during
+translation by guix-transfer, not in this repo — see
+[Patching packages](#patching-packages).
 
 ## Syncing Manually
 
@@ -128,103 +125,47 @@ nix build .#hello --option filter-syscalls false --option sandbox false
 nix shell .#zile --option filter-syscalls false --option sandbox false
 ```
 
-## Patching packages with overlays
+## Patching packages
 
-The derivations under `pkgs/` are a **faithful** copy of Guix — they are
-regenerated wholesale on every sync, so editing them by hand is pointless (your
-changes would be overwritten). But some packages still need small, Nix-specific
-adjustments to build under Nix's daemon, because Guix's build sandbox and Nix's
-are not identical. For example, bootstrap toolchain test suites probe signals,
-file descriptors and `/bin/sh` in ways that differ between the two daemons, so a
-`check` phase can fail under Nix even though it passed upstream in Guix.
+The derivations under `pkgs/` are a **faithful** copy of Guix — regenerated
+wholesale on every sync, so hand-editing them is pointless (changes are
+overwritten). But some packages need small, Nix-specific adjustments to build
+under Nix's daemon, because Guix's build sandbox and Nix's are not identical
+(e.g. bootstrap toolchain test suites probe signals, file descriptors and
+`/bin/sh` differently and can fail a `check` phase under Nix that passed upstream
+in Guix).
 
-Those adjustments live in **`overlays.nix`**, outside `pkgs/`, so they survive
-every regeneration.
+**All such fixes are applied at translation time, in
+[guix-transfer](https://github.com/fzakaria/guix-transfer) — never as a Nix
+overlay in this repo.**
 
-### How it works
+### Why not a Nix overlay?
 
-`flake.nix` loads every `store/*.nix` file into a single fixpoint keyed by
-store-file basename. Because each derivation references its dependencies through
-that set (`pkgs."<key>"`), an overlay applied to one package **propagates to
-every dependent** — patch `m4` once and everything that builds against it picks
-up the change automatically.
+Guix bakes **absolute dependency store paths** into each package's builder script
+(the Guile `%build-inputs`):
 
-Each entry in `overlays.nix` is a standard Nix overlay (`final: prev: attrs`),
-applied in order. You build them with the helpers in
-`lib/overlay-helpers.nix`.
-
-### Available helpers
-
-There are two flavours of helper. **Package transformers** take a derivation
-and return a modified one (`drv -> drv`):
-
-| Helper | Effect |
-| --- | --- |
-| `disableTests` | Disable the gnu-build-system `check` phase entirely (`#:tests? #f`). |
-| `patchTests subs` | Apply `{ from; to; }` substitutions to the builder — e.g. drop a single flaky test subcase while keeping the rest. |
-| `patchBuilder fn` | The primitive the above build on: rewrite the package's `*-builder` script with a `string -> string` function. |
-| `dropReferenceChecks` | Remove the daemon reference-check attributes (`allowed`/`disallowed` `References`/`Requisites`) when a specifier points at an untranslated `/gnu/store` path. |
-
-**Overlay builders** wrap a transformer into a ready-to-use overlay that targets
-every derivation with a given `name` (`name -> overlay`):
-
-| Helper | Equivalent to |
-| --- | --- |
-| `disableTestsFor "pkg-1.2.3"` | `overrideByName "pkg-1.2.3" disableTests` |
-| `patchTestsFor "pkg-1.2.3" subs` | `overrideByName "pkg-1.2.3" (patchTests subs)` |
-| `dropReferenceChecksFor "pkg-1.2.3"` | `overrideByName "pkg-1.2.3" dropReferenceChecks` |
-| `overrideByName "pkg-1.2.3" f` | Apply transformer `f` to every package named `pkg-1.2.3`. |
-
-> [!TIP]
-> Target packages by **name** (`disableTestsFor "m4-boot0-1.4.19"`) rather than
-> by store-file key. Names are stable, whereas the store hash changes whenever a
-> package's inputs change on a re-sync — so a name-keyed overlay keeps working
-> across syncs.
-
-### Example
-
-`overlays.nix`:
-
-```nix
-{ helpers }:
-
-with helpers;
-
-[
-  # Bootstrap m4's bundled gnulib tests (test-execute, 198.sysval) probe the
-  # sandbox and fail under Nix's daemon though they pass under Guix's.
-  (disableTestsFor "m4-boot0-1.4.19")
-
-  # perl-boot0's disallowedReferences points at the bootstrap binutils, which
-  # has no Nix translation; Nix rejects it as an illegal reference specifier.
-  (dropReferenceChecksFor "perl-boot0-5.36.0")
-
-  # Surgically drop one flaky test subcase instead of the whole suite:
-  # (patchTestsFor "some-pkg-1.0" [ { from = ''"4 5 6"''; to = ''"4 6"''; } ])
-
-  # Anything more bespoke: an arbitrary drv -> drv transform by name.
-  # (overrideByName "some-pkg-1.0" (drv: /* … */ drv))
-]
+```scheme
+("perl" . "/nix/store/h0gbcdg…-perl-boot0-5.36.0")
 ```
 
-### Writing your own helper
+Those builder scripts are frozen source files. If you change a package's
+derivation in a way that alters its **output hash** (disabling tests, rewriting
+the builder, dropping an attribute), every consumer's builder still points at the
+*old* path — so the dependency vanishes from the consumer's `PATH` at build time
+(classic symptom: `configure: error: perl not found`). A Nix overlay can't fix
+this because it can't rewrite the frozen builders. The change has to happen where
+builders *and* dependency edges are emitted together: during translation.
 
-Helpers are plain functions in `lib/overlay-helpers.nix`. The most common
-building block is `patchBuilder`, since gnu-build-system flags (like `#:tests?`)
-are baked into the Guile builder script and can only be changed by rewriting it:
+### How it's done
 
-```nix
-# Force a configure flag into a package's build.
-addConfigureFlag = flag: patchBuilder (builtins.replaceStrings
-  [ "#:configure-flags (quote (" ]
-  [ "#:configure-flags (quote (\"${flag}\" " ]);
-```
+guix-transfer applies these fixes before any path is hashed, so the modified
+build and all downstream references stay consistent:
 
-Then expose an overlay form with `overrideByName "pkg" (addConfigureFlag "…")`.
+| Problem | Handled by |
+| --- | --- |
+| Bootstrap test suites fail under Nix's sandbox | `guix-transfer --disable-tests` rewrites `#:tests? #t` → `#:tests? #f` in every `*-builder` script. The `nix run .#sync` app passes this flag. |
+| `disallowedReferences` (etc.) point at an untranslated `/gnu/store` path, which Nix rejects as an illegal reference specifier | guix-transfer filters invalid specifiers out of the `allowed`/`disallowed` `References`/`Requisites` attributes. |
 
-> [!NOTE]
-> These fixups are deliberately a thin Nix-side layer. Where a problem is really
-> a translation bug (e.g. an untranslated `/gnu/store` reference), it is also
-> fixed at the source in [guix-transfer](https://github.com/fzakaria/guix-transfer)
-> so future syncs emit correct expressions — at which point the corresponding
-> overlay simply becomes a no-op.
+If a new package needs a tweak, add it to guix-transfer (e.g. a builder
+substitution applied in `stage_source`) and re-sync — there is deliberately no
+overlay layer to reach for.

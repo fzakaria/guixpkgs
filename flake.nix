@@ -21,29 +21,12 @@
     pkgs = nixpkgs.legacyPackages.${system};
     lib = pkgs.lib;
 
-    storeDir = ./pkgs/store;
-
-    # Overlay helper library + the list of Nix-specific fixups.
-    overlayHelpers = import ./lib/overlay-helpers.nix { inherit lib; };
-    overlays = import ./overlays.nix { helpers = overlayHelpers; };
-
-    # Each generated store file is `{ pkgs }: builtins.derivation { … }` and
-    # references its peers through `pkgs."<store-basename>"`. Load them all and
-    # tie them into a fixpoint keyed by store-file basename, so every dependency
-    # edge resolves through `self` — which is what lets overlays propagate
-    # across the whole transitive graph.
-    loadStore = self:
-      lib.mapAttrs'
-        (fn: _: lib.nameValuePair (lib.removeSuffix ".nix" fn)
-                  (import (storeDir + "/${fn}") { pkgs = self; }))
-        (lib.filterAttrs (n: t: t == "regular" && lib.hasSuffix ".nix" n)
-          (builtins.readDir storeDir));
-
-    guixStore = lib.fix (self:
-      lib.foldl' (acc: ov: acc // ov self acc) (loadStore self) overlays);
-
-    # Resolve friendly names (pkgs/by-name/<l>/<name>.nix holds a "<basename>"
-    # string) to entries in the overlaid fixpoint.
+    # Lazily load all by-name packages. Each by-name file imports its translated
+    # derivation from pkgs/store directly; the store files reference each other
+    # by `(import ../store/<file>.nix).<output>`, so the whole graph resolves
+    # without any extra machinery. Package-specific build fixups are applied at
+    # translation time in guix-transfer (see README "Patching packages"), so
+    # there is deliberately no overlay layer here.
     readByName = dir:
       let
         letters = builtins.readDir dir;
@@ -51,7 +34,7 @@
           if type == "directory" then
             lib.mapAttrs'
               (fn: _: lib.nameValuePair (lib.removeSuffix ".nix" fn)
-                        guixStore.${import (dir + "/${letter}/${fn}")})
+                        (import (dir + "/${letter}/${fn}")))
               (lib.filterAttrs (n: _: lib.hasSuffix ".nix" n)
                 (builtins.readDir (dir + "/${letter}")))
           else {};
@@ -78,7 +61,11 @@
       guix time-machine -C channels.scm -- repl ./get-all-derivations.scm > drv_mapping.txt
       
       echo "Translating Guix derivations to Nix expressions..."
-      awk '{print $2}' drv_mapping.txt | xargs ${guix-transfer.packages.${system}.default}/bin/guix-transfer --emit-nix-dir pkgs > transfer_out.txt
+      # --disable-tests: skip the gnu-build-system check phase at translation
+      # time. Guix's bootstrap test suites probe the daemon sandbox and fail
+      # under Nix; this must be done here (not via a Nix overlay) because
+      # builders bake in absolute dependency paths — see README "Patching".
+      awk '{print $2}' drv_mapping.txt | xargs ${guix-transfer.packages.${system}.default}/bin/guix-transfer --disable-tests --emit-nix-dir pkgs > transfer_out.txt
 
       echo "Creating by-name mapping..."
       mkdir -p pkgs/by-name
@@ -93,10 +80,7 @@
               if [ -f "pkgs/store/$nix_filename" ]; then
                   letter=$(echo "$name" | cut -c 1 | tr '[:upper:]' '[:lower:]')
                   mkdir -p "pkgs/by-name/$letter"
-                  # Store files are now `{ pkgs }: …` functions resolved through
-                  # the fixpoint in flake.nix, so by-name holds the store-file
-                  # basename (a key into that set) rather than a direct import.
-                  printf '"%s"\n' "''${nix_filename%.nix}" > "pkgs/by-name/$letter/$name.nix"
+                  echo "import ../../store/$nix_filename" > "pkgs/by-name/$letter/$name.nix"
               fi
           fi
       done < name_to_nix_drv.txt
@@ -112,13 +96,6 @@
 
   in {
     packages.${system} = if builtins.pathExists ./pkgs/by-name then readByName ./pkgs/by-name else {};
-
-    # The full overlaid fixpoint, keyed by store-file basename. Useful for
-    # building transitive derivations directly and for downstream overlays.
-    legacyPackages.${system} = guixStore;
-
-    # Re-export the overlay helpers so consumers can write their own fixups.
-    overlayHelpers = overlayHelpers;
 
     apps.${system}.sync = {
       type = "app";
