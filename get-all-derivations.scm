@@ -1,26 +1,119 @@
-(use-modules (gnu packages) (guix packages) (guix store) (guix derivations) (srfi srfi-1) (ice-9 match))
+(use-modules (gnu packages)
+             (guix derivations)
+             (guix gexp)
+             (guix packages)
+             (guix profiles)
+             (guix search-paths)
+             (guix store)
+             (ice-9 match)
+             (srfi srfi-1))
 
-(with-store %store
-  (for-each
-    (lambda (pkg-name)
-      (catch #t
-        (lambda ()
-          (let* ((package (specification->package pkg-name))
-                 (drv (package-derivation %store package "x86_64-linux" #:graft? #f)))
-            (format #t "~a\t~a\n" (package-name package) (derivation-file-name drv))))
-        (lambda (key . args)
-          (format (current-error-port) "Failed: ~a\n" pkg-name))))
-    ;; Unknown names are caught and skipped above, so this list is safe to extend.
-    '("hello"
-      "bash"
-      "coreutils"
-      ;; Guile libraries packaged in Guix but absent from nixpkgs — these make
-      ;; the strongest "transfer" demo (nixpkgs simply has no equivalent).
-      "guile-png"      ; pure-Scheme PNG encoder/decoder
-      "guile-dsv"      ; delimiter-separated values (CSV/DSV) parser
-      "guile-ics"      ; iCalendar (RFC 5545) parser/printer
-      "guile-wisp"     ; whitespace-significant Scheme syntax (SRFI-119)
-      "guile-pipe"     ; threading/pipe macros
-      "g-golf"         ; GObject-introspection bindings (drive GTK from Scheme)
-      "guile-cv"       ; computer-vision library
-      "guile-studio")))
+(define %package-names
+  ;; Unknown names are caught and skipped below, so this list is safe to extend.
+  '("hello"
+    "bash"
+    "coreutils"
+    ;; Guile libraries packaged in Guix but absent from nixpkgs -- these make
+    ;; the strongest "transfer" demo (nixpkgs simply has no equivalent).
+    "guile-png"      ; pure-Scheme PNG encoder/decoder
+    "guile-dsv"      ; delimiter-separated values (CSV/DSV) parser
+    "guile-ics"      ; iCalendar (RFC 5545) parser/printer
+    "guile-wisp"     ; whitespace-significant Scheme syntax (SRFI-119)
+    "guile-pipe"     ; threading/pipe macros
+    "g-golf"         ; GObject-introspection bindings (drive GTK from Scheme)
+    "guile-cv"       ; computer-vision library
+    "guile-studio"))
+
+(define (input->manifest-entries input)
+  (match input
+    ((_ (? package? package) outputs ...)
+     (map (lambda (output)
+            (package->manifest-entry package output))
+          (if (null? outputs) '("out") outputs)))
+    (_ '())))
+
+(define (package-runtime-entries package)
+  ;; Include target/runtime inputs too: many Guix packages keep language modules
+  ;; as ordinary inputs, but their executables still need those search paths.
+  (delete-duplicates
+   (cons (package->manifest-entry package)
+         (append-map input->manifest-entries
+                     (package-transitive-target-inputs package)))
+   manifest-entry=?))
+
+(define (search-path-key spec)
+  (list (search-path-specification-variable spec)
+        (search-path-specification-files spec)
+        (search-path-specification-separator spec)
+        (search-path-specification-file-type spec)
+        (search-path-specification-file-pattern spec)))
+
+(define (same-search-path? a b)
+  (equal? (search-path-key a) (search-path-key b)))
+
+(define (runtime-search-paths entries)
+  ;; Match Guix profile behavior for search-path specs, but without building a
+  ;; union profile. The wrapper only needs the generated shell environment.
+  (delete-duplicates
+   (cons* $PATH
+          $GUIX_EXTENSIONS_PATH
+          (append-map manifest-entry-search-paths entries))
+   same-search-path?))
+
+(define (runtime-env-derivation store package)
+  (let* ((entries (package-runtime-entries package))
+         (roots (map (lambda (entry)
+                       (gexp-input (manifest-entry-item entry)
+                                   (manifest-entry-output entry)))
+                     entries))
+         (search-paths (runtime-search-paths entries)))
+    (parameterize ((%graft? #f))
+      (run-with-store store
+        (gexp->derivation
+         (string-append (package-name package) "-runtime-env")
+         (with-imported-modules '((guix build utils)
+                                  (guix records)
+                                  (guix search-paths))
+           #~(begin
+               (use-modules (guix build utils)
+                            (guix search-paths)
+                            (ice-9 match))
+               (define roots (list #$@roots))
+               (define search-paths
+                 (map sexp->search-path-specification
+                      '#$(sexp->gexp
+                          (map search-path-specification->sexp search-paths))))
+               (mkdir-p (string-append #$output "/etc"))
+               (call-with-output-file (string-append #$output "/etc/profile")
+                 (lambda (port)
+                   (display "# Generated by GuixPkgs from Guix search path specifications.\n" port)
+                   (for-each
+                    (match-lambda
+                      ((search-path . value)
+                       (display (search-path-definition search-path value #:kind 'prefix)
+                                port)
+                       (newline port)))
+                    (evaluate-search-paths search-paths roots (lambda _ #f)))))))
+         #:system "x86_64-linux"
+         #:local-build? #t
+         #:substitutable? #f
+         #:properties '((type . guixpkgs-runtime-env)))))))
+
+(define (emit-package store pkg-name)
+  (catch #t
+    (lambda ()
+      (parameterize ((%graft? #f))
+        (let* ((package (specification->package pkg-name))
+               (package-drv (package-derivation store package "x86_64-linux"
+                                                #:graft? #f))
+               (runtime-env-drv (runtime-env-derivation store package)))
+          (format #t "~a\t~a\t~a\n"
+                  (package-name package)
+                  (derivation-file-name package-drv)
+                  (derivation-file-name runtime-env-drv)))))
+    (lambda _
+      (format (current-error-port) "Failed: ~a\n" pkg-name))))
+
+(with-store store
+  (for-each (lambda (name) (emit-package store name))
+            %package-names))
