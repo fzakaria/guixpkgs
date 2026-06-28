@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Farid Zakaria
+# SPDX-License-Identifier: MIT
 """Sync the Nix package set from upstream Guix.
 
 Pipeline:

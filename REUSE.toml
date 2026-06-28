@@ -1,0 +1,13 @@
+version = 1
+SPDX-PackageName = "guixpkgs"
+SPDX-PackageDownloadLocation = "https://github.com/fzakaria/guixpkgs"
+
+[[annotations]]
+path = "**"
+SPDX-FileCopyrightText = "2026 Farid Zakaria"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = ["pkgs/store/**", "pkgs/sources/**"]
+SPDX-FileCopyrightText = "The GNU Guix authors"
+SPDX-License-Identifier = "GPL-3.0-or-later"

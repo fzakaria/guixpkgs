@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Farid Zakaria
+# SPDX-License-Identifier: MIT
 {
   description = "GuixPkgs: Guix packages via Nix";
 
@@ -38,6 +40,7 @@
       #   nix    -> nixfmt
       #   bash   -> shfmt
       #   python -> black
+      #   toml   -> taplo
       #   scheme -> `guix style -f` (whole-file reindent; works on any .scm,
       #             not just package definitions, and needs no guix-daemon).
       # The vendored/generated Guix trees are never touched.
@@ -53,6 +56,7 @@
         programs.nixfmt.enable = true;
         programs.shfmt.enable = true;
         programs.black.enable = true;
+        programs.taplo.enable = true;
 
         settings.formatter.scheme = {
           command = "${pkgs.guix}/bin/guix";

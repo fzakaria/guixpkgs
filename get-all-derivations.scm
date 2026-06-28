@@ -1,3 +1,6 @@
+;;; SPDX-FileCopyrightText: 2026 Farid Zakaria
+;;; SPDX-License-Identifier: MIT
+
 (use-modules (gnu packages)
              (guix packages)
              (guix store)
