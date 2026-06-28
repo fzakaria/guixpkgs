@@ -1,1 +1,5 @@
-import ../../store/xk9qh00407d7r483cs3fp475mgbzgw87-guile-studio-0.1.1-1.dd0ad42.nix
+{ pkgs }:
+pkgs.callPackage ../../wrap-guix-package.nix {
+  package = import ../../store/zkakjvfsgzfx432k8ps7b57saa5hzxzd-guile-studio-0.1.1-1.dd0ad42.nix;
+  runtimeEnv = import ../../store/pwc04blj5nckcfm3vz4ak9rxgn2c9r59-guile-studio-runtime-env.nix;
+}
