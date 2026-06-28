@@ -172,9 +172,11 @@ entirely so the Nix wrapper can skip wrapping its binaries. Build options:
                                                                          (for-each (lambda 
                                                                                            (definition)
                                                                                      
+                                                                                     
                                                                                      (display
                                                                                       definition
                                                                                       port)
+
                                                                                      
                                                                                      (newline
                                                                                       port))
