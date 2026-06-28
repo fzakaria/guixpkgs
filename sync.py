@@ -3,9 +3,11 @@
 """Sync the Nix package set from upstream Guix.
 
 Pipeline:
-  1. Resolve each requested package's derivation with ``guix time-machine``.
-  2. Translate those Guix derivations to Nix with ``guix-transfer``.
-  3. Lay the results out under ``pkgs/by-name/<letter>/<name>.nix``.
+  1. Resolve each package's own derivation plus a generated runtime-environment
+     derivation with ``guix time-machine`` (see get-all-derivations.scm).
+  2. Translate both derivations to Nix with ``guix-transfer``.
+  3. Lay out ``pkgs/by-name/<letter>/<name>.nix`` wrappers that source the
+     runtime environment around the translated package.
   4. Record provenance in ``guix-metadata.json``.
 
 The two ``@...@`` constants below are substituted by ``flake.nix`` at build
@@ -60,28 +62,46 @@ class GuixChannel:
 
 @dataclass(frozen=True)
 class GuixDerivation:
-    """One row of ``get-all-derivations.scm`` output: name + store .drv path."""
+    """One row of ``get-all-derivations.scm`` output.
+
+    Tab-separated: the package name, the package's own ``.drv`` path, and the
+    ``.drv`` for its generated runtime-environment profile.
+    """
 
     name: str
-    drv_path: str
+    package_drv_path: str
+    runtime_env_drv_path: str
 
     @classmethod
     def parse(cls, line: str) -> "GuixDerivation":
-        name, drv_path = line.split("\t")
-        return cls(name=name, drv_path=drv_path)
+        name, package_drv_path, runtime_env_drv_path = line.split("\t")
+        return cls(
+            name=name,
+            package_drv_path=package_drv_path,
+            runtime_env_drv_path=runtime_env_drv_path,
+        )
 
 
 @dataclass(frozen=True)
 class TransferredPackage:
-    """A Guix package translated to a Nix derivation in ``pkgs/store``."""
+    """A translated Guix package paired with its runtime-env derivation."""
 
     name: str
-    nix_drv_path: str
+    package_nix_drv_path: str
+    runtime_env_nix_drv_path: str
+
+    @staticmethod
+    def _store_filename(nix_drv_path: str) -> str:
+        """The ``pkgs/store`` ``.nix`` file name for a translated ``.drv`` path."""
+        return Path(nix_drv_path).with_suffix(".nix").name
 
     @property
-    def store_filename(self) -> str:
-        """The ``.nix`` file expected under ``pkgs/store`` for this package."""
-        return Path(self.nix_drv_path).with_suffix(".nix").name
+    def package_store_filename(self) -> str:
+        return self._store_filename(self.package_nix_drv_path)
+
+    @property
+    def runtime_env_store_filename(self) -> str:
+        return self._store_filename(self.runtime_env_nix_drv_path)
 
     @property
     def letter(self) -> str:
@@ -131,47 +151,67 @@ def fetch_derivations(channels_scm: Path) -> list[GuixDerivation]:
 
 
 def translate(derivations: list[GuixDerivation]) -> list[TransferredPackage]:
-    """Translate Guix derivations to Nix, pairing outputs with inputs by order."""
-    print("Translating Guix derivations to Nix expressions...")
+    """Translate each package and its runtime-env derivation to Nix.
+
+    The package and runtime-env derivations are fed to guix-transfer interleaved
+    (package, env, package, env, ...); it emits one Nix .drv path per input in
+    order, so we split the output back into pairs aligned with the inputs.
+    """
+    print("Translating Guix package and runtime-env derivations to Nix...")
     # --disable-tests: skip the gnu-build-system check phase at translation
     # time. Guix's bootstrap test suites probe the daemon sandbox and fail
     # under Nix; this must happen here (not via a Nix overlay) because builders
     # bake in absolute dependency paths -- see README "Patching".
+    drv_paths: list[str] = []
+    for derivation in derivations:
+        drv_paths.append(derivation.package_drv_path)
+        drv_paths.append(derivation.runtime_env_drv_path)
     output = run(
-        [
-            GUIX_TRANSFER,
-            "--disable-tests",
-            "--emit-nix-dir",
-            "pkgs",
-            *(derivation.drv_path for derivation in derivations),
-        ]
+        [GUIX_TRANSFER, "--disable-tests", "--emit-nix-dir", "pkgs", *drv_paths]
     )
-    # guix-transfer emits one Nix .drv path per input, in order; a blank line
-    # marks a derivation it could not translate and is skipped.
+
+    # lines[0::2] are the package drvs, lines[1::2] the matching runtime-env drvs.
+    # A blank in either slot marks a derivation guix-transfer skipped.
+    lines = output.splitlines()
     packages: list[TransferredPackage] = []
-    for derivation, nix_drv_path in zip(derivations, output.splitlines()):
-        nix_drv_path = nix_drv_path.strip()
-        if nix_drv_path:
+    for derivation, package_nix, env_nix in zip(derivations, lines[0::2], lines[1::2]):
+        package_nix, env_nix = package_nix.strip(), env_nix.strip()
+        if package_nix and env_nix:
             packages.append(
-                TransferredPackage(name=derivation.name, nix_drv_path=nix_drv_path)
+                TransferredPackage(
+                    name=derivation.name,
+                    package_nix_drv_path=package_nix,
+                    runtime_env_nix_drv_path=env_nix,
+                )
             )
     return packages
 
 
+def by_name_entry(package: TransferredPackage) -> str:
+    """Render a by-name entry: a ``{ pkgs }`` function building the wrapper."""
+    return (
+        "{ pkgs }:\n"
+        "pkgs.callPackage ../../wrap-guix-package.nix {\n"
+        f"  package = import ../../store/{package.package_store_filename};\n"
+        f"  runtimeEnv = import ../../store/{package.runtime_env_store_filename};\n"
+        "}\n"
+    )
+
+
 def write_by_name(packages: list[TransferredPackage]) -> int:
-    """Rebuild ``pkgs/by-name`` from translated packages; return count written."""
-    print("Creating by-name mapping...")
+    """Rebuild ``pkgs/by-name`` with wrapper entries; return the count written."""
+    print("Creating by-name wrappers...")
     if BY_NAME.exists():
         shutil.rmtree(BY_NAME)
     written = 0
     for package in packages:
-        if not (STORE / package.store_filename).exists():
+        package_file = STORE / package.package_store_filename
+        runtime_env_file = STORE / package.runtime_env_store_filename
+        if not (package_file.exists() and runtime_env_file.exists()):
             continue
         letter_dir = BY_NAME / package.letter
         letter_dir.mkdir(parents=True, exist_ok=True)
-        (letter_dir / f"{package.name}.nix").write_text(
-            f"import ../../store/{package.store_filename}\n"
-        )
+        (letter_dir / f"{package.name}.nix").write_text(by_name_entry(package))
         written += 1
     return written
 

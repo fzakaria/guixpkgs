@@ -68,21 +68,30 @@
         };
       };
 
-      # Lazily load all by-name packages. Each by-name file imports its translated
-      # derivation from pkgs/store directly; the store files reference each other
-      # by `(import ../store/<file>.nix).<output>`, so the whole graph resolves
-      # without any extra machinery. Package-specific build fixups are applied at
-      # translation time in guix-transfer (see README "Patching packages"), so
+      # Lazily load all by-name packages. The store files reference each other by
+      # `(import ../store/<file>.nix).<output>`, so the whole graph resolves
+      # without any extra machinery, and package-specific build fixups are applied
+      # at translation time in guix-transfer (see README "Patching packages") --
       # there is deliberately no overlay layer here.
+      #
+      # A current by-name file is a function of `{ pkgs }` that builds a wrapped
+      # package; older syncs emitted a plain translated derivation. We accept both
+      # so the tree keeps evaluating across a re-sync.
       readByName =
         dir:
         let
+          loadPackage =
+            path:
+            let
+              value = import path;
+            in
+            if lib.isFunction value then value { inherit pkgs; } else value;
           letters = builtins.readDir dir;
           loadLetter =
             letter: type:
             if type == "directory" then
               lib.mapAttrs' (
-                fn: _: lib.nameValuePair (lib.removeSuffix ".nix" fn) (import (dir + "/${letter}/${fn}"))
+                fn: _: lib.nameValuePair (lib.removeSuffix ".nix" fn) (loadPackage (dir + "/${letter}/${fn}"))
               ) (lib.filterAttrs (n: _: lib.hasSuffix ".nix" n) (builtins.readDir (dir + "/${letter}")))
             else
               { };
