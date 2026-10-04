@@ -1,8 +1,9 @@
 name: Sync upstream Guix
 
 on:
-  schedule:
-    - cron: '0 0 * * 0' # Run weekly on Sundays
+  # The weekly schedule is disabled; re-enable by restoring the block below.
+  # schedule:
+  #   - cron: '0 0 * * 0' # Run weekly on Sundays
   workflow_dispatch: # Allow manual triggers
 
 jobs:
